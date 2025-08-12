@@ -1,3 +1,4 @@
+# Data to be used
 products = [
     {
         'title': 'Smartphone X1',
@@ -229,4 +230,91 @@ products = [
     }
 ]
 
+last_product={'title': 'Building Blocks Deluxe Set',
+ 'short_description': 'Unleash your creativity with this deluxe set of building blocks for endless fun.',
+ 'price': 34.99,
+ 'category': 'Toys',
+ 'features': ['Includes 500+ colorful building blocks',
+  'Promotes STEM learning and creativity',
+  'Compatible with other major brick brands',
+  'Comes with a durable storage container',
+  'Ideal for children ages 3 and up']}
 
+user_history = [{'title': 'Remote-Controlled Dinosaur Toy',
+  'short_description': 'Roar into action with this remote-controlled dinosaur toy with lifelike movements.',
+  'price': 49.99,
+  'category': 'Toys',
+  'features': ['Realistic dinosaur sound effects',
+   'Walks and roars like a real dinosaur',
+   'Remote control included',
+   'Educational and entertaining']},
+ {'title': 'Building Blocks Deluxe Set',
+  'short_description': 'Unleash your creativity with this deluxe set of building blocks for endless fun.',
+  'price': 34.99,
+  'category': 'Toys',
+  'features': ['Includes 500+ colorful building blocks',
+   'Promotes STEM learning and creativity',
+   'Compatible with other major brick brands',
+   'Comes with a durable storage container',
+   'Ideal for children ages 3 and up']}]
+
+# Funcitons
+def create_product_text(product):
+  return f"""Title: {product['title']}
+Description: {product['short_description']}
+Category: {product['category']}
+Features: {'; '.join(product['features'])}"""
+
+def create_embeddings(texts):
+  response = client.embeddings.create(
+    model="text-embedding-3-small",
+    input=texts
+  )
+  response_dict = response.model_dump()
+
+  return [data['embedding'] for data in response_dict['data']]
+
+def find_n_closest(query_vector, embeddings, n=3):
+  distances = []
+  for index, embedding in enumerate(embeddings):
+    dist = distance.cosine(query_vector, embedding)
+    distances.append({"distance": dist, "index": index})
+  distances_sorted = sorted(distances, key=lambda x: x["distance"])
+  return distances_sorted[0:n]
+
+#### Example Recomendation system based
+# Combine the features for last_product and each product in products
+last_product_text = [create_product_text(last_product)]
+product_texts = [create_product_text(product)for product in products]
+
+# Embed last_product_text and product_texts
+last_product_embeddings = create_embeddings(last_product_text)[0]
+product_embeddings = create_embeddings(product_texts)
+
+# Find the three smallest cosine distances and their indexes
+hits = find_n_closest(last_product_embeddings, product_embeddings)
+
+for hit in hits:
+  product = products[hit['index']]
+  print(product['title'])
+
+
+#### Example Adding user history to the recommendation engine, this example is about getting tree recomendations based on what the user saw:
+
+# Prepare and embed the user_history, and calculate the mean embeddings
+history_texts = [create_product_text(article) for article in user_history]
+history_embeddings = create_embeddings(history_texts)
+mean_history_embeddings = np.mean(history_embeddings,axis=0)
+
+# Filter products to remove any in user_history
+products_filtered = [article for article in products if article not in history_texts]
+
+# Combine product features and embed the resulting texts
+product_texts = [create_product_text(product) for product in products_filtered]
+product_embeddings = create_embeddings(product_texts)
+
+hits = find_n_closest(mean_history_embeddings, product_embeddings)
+
+for hit in hits:
+  product = products_filtered[hit['index']]
+  print(product['title'])
